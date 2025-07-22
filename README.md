@@ -85,6 +85,16 @@ When an external service (e.g. Stripe, Paystack) sends your app a webhook:
        |----------------->|------------------->|--------------------->|------------------------>| to handler_url
 ```
 
+When an external service (e.g. Stripe, Paystack or any custom source) sends your app a webhook:
+
+- Webhook hits Baqo at `POST /webhooks/{source}`
+- Baqo verifies the signature (if configured, skips if not)
+- Extracts the event ID (based on your configuration)
+- Logs the event to the database
+- Deduplicates if an event with the same ID already exists
+- Queues the event for delivery to your backend using Celery
+- Baqo worker delivers the event to your configured handler URL in the background, with retries if needed
+
 ---
 
 ## 🧩 What Baqo Provides
