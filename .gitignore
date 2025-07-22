@@ -1,0 +1,53 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+develop-eggs/
+.eggs/
+lib/
+lib64/
+parts/
+var/
+*.sqlite3
+*.db
+
+# Virtual environments
+.env/
+.venv/
+venv/
+ENV/
+env.bak/
+env/
+
+# Editor & IDE files
+.vscode/
+.idea/
+*.swp
+
+# Python tooling caches
+.mypy_cache/
+pytest_cache/
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+.coverage.*
+htmlcov/
+
+# Docker
+.dockerignore
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

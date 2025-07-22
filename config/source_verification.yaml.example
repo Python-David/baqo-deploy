@@ -1,0 +1,19 @@
+sources:
+  stripe:
+    type: stripe
+    secret: ${STRIPE_SECRET}
+    event_id_path: id
+    handler_url: http://host.docker.internal:9002/
+    verify: true
+
+  mycompany_service:
+    type: mycompany_signature
+    secret: ${MY_COMPANY_SERVICE_SECRET}
+    event_id_path: id
+    handler_url: http://host.docker.internal:9003/
+    verify: false
+
+  open_service:
+    type: none
+    event_id_path: data.transaction_id
+    handler_url: https://example.com/handler
