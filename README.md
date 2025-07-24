@@ -163,13 +163,13 @@ Baqo uses environment variables (typically from a `.env` file) to control key ru
 | `CELERY_BROKER_URL`      | URL for Redis broker used by Celery                            |
 | `CELERY_RESULT_BACKEND`  | Backend store for Celery task results (also Redis)             |
 | `CELERY_MAX_RETRIES`     | Max number of retries for forwarding failed events             |
-| `CELERY_BACKOFF_BASE_DELAY` | Base delay (in seconds) before retrying a failed task       |
+| `CELERY_BACKOFF_BASE_DELAY` | Base delay (in seconds) before retrying a failed task          |
 | `LOG_LEVEL`              | Logging level (DEBUG, INFO, etc.)                              |
-| `LOG_FORMAT`             | Format for log messages                                         |
-| `LOG_DATE_FORMAT`        | Format for timestamps in logs                                   |
-| `SOURCE_VERIFICATION_FILE` | Path to the YAML file with source configuration             |
+| `LOG_FORMAT`             | Format for log messages                                        |
+| `LOG_DATE_FORMAT`        | Format for timestamps in logs                                  |
+| `SOURCE_VERIFICATION_FILE` | Path to the YAML file with source configuration                |
 | `RUNNING_IN_DOCKER`      | Used internally to determine DB host resolution (keep as true) |
-| `RUNNING_TESTS_IN_DOCKER`| Same as above, for test containers                              |
+| `RUNNING_TESTS_IN_DOCKER`| Same as above, for test containers (keep as true)              |
 
 ---
 
