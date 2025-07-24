@@ -15,6 +15,8 @@ async def verify_signature(secret: str, headers: Headers, body_str: str):
 
     This function must follow this exact signature to work with Baqo.
     """
+    print("Custom MyCompany verification logic was called!")
+
     signature = headers.get("x-mycompany-signature")
     if not signature:
         raise HTTPException(status_code=400, detail="Missing MyCompany signature")

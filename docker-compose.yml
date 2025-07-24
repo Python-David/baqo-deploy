@@ -23,8 +23,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./config/source_verification.yaml:/app/config/source_verification.yaml
-      - ./custom_verifications:/app/app/custom_verifications
+      - ./config/source_verification.yaml:/code/config/source_verification.yaml
+      - ./custom_verifications:/code/app/custom_verifications
     depends_on:
       - db
 
@@ -35,8 +35,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./config/source_verification.yaml:/app/config/source_verification.yaml
-      - ./custom_verifications:/app/app/custom_verifications
+      - ./config/source_verification.yaml:/code/config/source_verification.yaml
+      - ./custom_verifications:/code/app/custom_verifications
     depends_on:
       - db
       - redis
@@ -48,8 +48,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./config/source_verification.yaml:/app/config/source_verification.yaml
-      - ./custom_verifications:/app/app/custom_verifications
+      - ./config/source_verification.yaml:/code/config/source_verification.yaml
+      - ./custom_verifications:/code/app/custom_verifications
     depends_on:
       - db
       - redis

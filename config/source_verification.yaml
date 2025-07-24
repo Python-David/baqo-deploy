@@ -10,7 +10,7 @@ sources:
     type: mycompany_signature
     secret: ${MY_COMPANY_SERVICE_SECRET}
     event_id_path: id
-    handler_url: http://host.docker.internal:9003/
+    handler_url: https://webhook.site/a487641e-6bfb-40f9-bfa8-b7ad6a1cbaba
     verify: false
 
   open_service:
