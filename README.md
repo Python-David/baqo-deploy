@@ -1,7 +1,6 @@
+# Baqo 🚀
 
-# Baqo
-
-**Baqo** is a secure, extensible webhook relay service designed for SaaS teams that want to ingest and process webhooks reliably without building complex verification, de-duplication, and retry logic from scratch.
+**Baqo** is a secure, extensible **bi-directional webhook relay service** — handling both **inbound** webhooks from third-party providers and **outbound** dispatch events to your own systems or partner APIs.
 
 ---
 
@@ -28,7 +27,7 @@ cp .env.example .env
 
 Set secrets like `POSTGRES_USER`, `STRIPE_SECRET`, etc.
 
-### 3. Configure Sources
+### 3. Configure Sources (Inbound)
 
 Edit `config/source_verification.yaml` to define your webhook sources:
 
@@ -38,9 +37,28 @@ sources:
     type: stripe
     secret: ${STRIPE_SECRET}
     event_id_path: id
-    handler_url: http://host.docker.internal:9000/  # Your backend URL
+    handler_url: http://host.docker.internal:9000/
     verify: true
 ```
+
+### 3b. Configure Destinations (Outbound)
+
+Baqo can also forward or dispatch events to external systems.  
+Define outbound destinations in the same YAML file:
+
+```yaml
+destinations:
+  meetball_success:
+    type: none
+    handler_url: http://host.docker.internal:9003/success
+    verify: false
+```
+
+You can then POST to:
+```
+POST /dispatch/meetball_success
+```
+to trigger an outbound delivery.
 
 ### 4. Build and Run Baqo Locally
 
@@ -54,26 +72,25 @@ This will:
 - Start Postgres, Redis, the Baqo app, and Celery worker
 - Run migrations automatically
 - Start accepting webhooks at `http://localhost:8000/webhooks/{source}`
+- Start dispatching outbound events at `http://localhost:8000/dispatch/{destination}`
 
-### 5. Test it
+### 5. Test It
 
-Send a webhook for testing:
-
+Inbound test:
 ```bash
 curl -X POST http://localhost:8000/webhooks/stripe   -H "Content-Type: application/json"   -H "stripe-signature: your-generated-signature"   -d '{"id": "evt_test_001", "data": {"object": {"id": "pi_001"}}}'
 ```
 
-Check logs:
-
+Outbound test:
 ```bash
-docker compose logs -f app
+curl -X POST http://localhost:8000/dispatch/meetball_success   -H "X-BAQO-KEY: secret123"   -H "Content-Type: application/json"   -d '{"event": "user.checkin", "data": {"id": 42}}'
 ```
 
 ---
 
 ## 🚀 How Baqo Works
 
-When an external service (e.g. Stripe, Paystack) sends your app a webhook:
+### Inbound Flow (Receive)
 
 ```plaintext
 +-------------+       +--------+        +-------------+        +--------------+       +------------------+
@@ -82,38 +99,37 @@ When an external service (e.g. Stripe, Paystack) sends your app a webhook:
 +-------------+       +--------+        +-------------+        +--------------+       +------------------+
        |                  |                    |                      |                         |
        | POST /webhooks   | verify signature   | log + deduplicate    | enqueue delivery        | POST payload
-       |----------------->|------------------->|--------------------->|------------------------>| to handler_url
 ```
 
-When an external service (e.g. Stripe, Paystack or any custom source) sends your app a webhook:
+### Outbound Flow (Dispatch)
 
-- Webhook hits Baqo at `POST /webhooks/{source}`
-- Baqo verifies the signature (if configured, skips if not)
-- Extracts the event ID (based on your configuration)
-- Logs the event to the database
-- Deduplicates if an event with the same ID already exists
-- Queues the event for delivery to your backend using Celery
-- Baqo worker delivers the event to your configured handler URL in the background, with retries if needed
+```plaintext
++-----------+       +--------+        +-------------+        +--------------+        +-------------------+
+| Your App  |  -->  |  Baqo  |  -->   |  Postgres    |  -->   |  Celery      |  -->  | External Endpoint |
+| (Client)  |       |  API   |        | (Event Log)  |        | Worker Queue |       | (Receiver System) |
++-----------+       +--------+        +-------------+        +--------------+        +-------------------+
+   |                  |                    |                      |                         |
+   | POST /dispatch   | create event       | log event            | enqueue delivery        | POST payload
+```
 
 ---
 
 ## 🧩 What Baqo Provides
 
-Baqo offers the following key services out-of-the-box:
-
-- **Webhook Verification**: HMAC or custom logic to verify incoming webhook authenticity
-- **Event Deduplication**: Avoid processing the same event multiple times via `event_id_path`
-- **Retry Logic**: Events are pushed to your handler URL with retry policies using Celery workers
-- **Event Logging**: Every incoming webhook is logged in your Postgres DB
-- **Extensible Verification**: Add your own logic for signature verification via simple plugins
+- ✅ **Webhook Verification** — HMAC or custom plugin-based verification  
+- 🔁 **Retry Logic** — Smart backoff for transient errors (Celery-powered)  
+- 🧱 **Deduplication** — Prevent reprocessing via event_id  
+- 🔒 **API Key Protection** — Secure outbound endpoints  
+- 📜 **Event Logging & Observability** — All attempts logged in Postgres  
+- ⚙️ **Extensible** — Add new verification or delivery strategies easily
 
 ---
 
 ## ⚙️ Configuration
 
-Configuration is managed via a YAML file, typically mounted into the container as `source_verification.yaml`.
+Baqo uses a YAML file mounted at `/app/config/source_verification.yaml`.
 
-### Example `source_verification.yaml`
+### Example
 
 ```yaml
 sources:
@@ -124,80 +140,86 @@ sources:
     handler_url: http://your-backend.com/stripe-events
     verify: true
 
-  mycompany:
-    type: mycompany_signature
-    secret: ${MYCOMPANY_SECRET}
-    event_id_path: data.txn_id
-    handler_url: http://your-backend.com/mycompany-handler
+  paystack:
+    type: paystack
+    secret: ${PAYSTACK_SECRET}
+    event_id_path: data.id
+    handler_url: http://your-backend.com/paystack-handler
     verify: true
 
-  open_source:
+destinations:
+  meetball_success:
     type: none
-    event_id_path: data.transaction_id
-    handler_url: https://example.com/open-handler
+    handler_url: http://host.docker.internal:9003/success
     verify: false
 ```
 
-### Field Explanations
+### Field Reference
 
-| Field             | Description                                                                 |
-|------------------|-----------------------------------------------------------------------------|
-| `type`           | The name of the verification plugin to use (e.g. `stripe`, `mycompany_signature`, or `none`) |
-| `secret`         | The secret used in the verification process (optional depending on type)     |
-| `event_id_path`  | Dot path to the unique ID of the event (used for deduplication)              |
-| `handler_url`    | The URL to forward verified events to                                        |
-| `verify`         | If false, skips signature verification (trusted sources only)                |
+| Field | Description |
+|--------|-------------|
+| `type` | Plugin type (for verification or categorization) |
+| `secret` | Secret key for signature verification (inbound only) |
+| `event_id_path` | JSON path to event ID for deduplication |
+| `handler_url` | Target URL for forwarding or dispatch |
+| `verify` | Whether to verify TLS/SSL (disable for trusted LANs) |
 
 ---
 
 ## 🧾 .env Configuration Reference
 
-Baqo uses environment variables (typically from a `.env` file) to control key runtime behavior.
-
-| Variable                 | Purpose                                                        |
-|--------------------------|----------------------------------------------------------------|
-| `POSTGRES_USER`          | Username for the Postgres database                             |
-| `POSTGRES_PASSWORD`      | Password for the Postgres database                             |
-| `POSTGRES_DB`            | Name of the Postgres database                                  |
-| `STRIPE_SECRET`, etc.    | Webhook secrets for each source, referenced in YAML            |
-| `CELERY_BROKER_URL`      | URL for Redis broker used by Celery                            |
-| `CELERY_RESULT_BACKEND`  | Backend store for Celery task results (also Redis)             |
-| `CELERY_MAX_RETRIES`     | Max number of retries for forwarding failed events             |
-| `CELERY_BACKOFF_BASE_DELAY` | Base delay (in seconds) before retrying a failed task          |
-| `LOG_LEVEL`              | Logging level (DEBUG, INFO, etc.)                              |
-| `LOG_FORMAT`             | Format for log messages                                        |
-| `LOG_DATE_FORMAT`        | Format for timestamps in logs                                  |
-| `SOURCE_VERIFICATION_FILE` | Path to the YAML file with source configuration                |
-| `RUNNING_IN_DOCKER`      | Used internally to determine DB host resolution (keep as true) |
-| `RUNNING_TESTS_IN_DOCKER`| Same as above, for test containers (keep as true)              |
+| Variable | Purpose |
+|-----------|----------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Database credentials |
+| `CELERY_BROKER_URL` | Redis broker for Celery |
+| `CELERY_RESULT_BACKEND` | Redis backend for Celery |
+| `CELERY_MAX_RETRIES` | Max delivery retries |
+| `CELERY_BACKOFF_BASE_DELAY` | Base delay for retry backoff |
+| `BAQO_API_KEY` | Protects outbound `/dispatch/*` endpoints |
+| `LOG_LEVEL`, `LOG_FORMAT`, `LOG_DATE_FORMAT` | Logging settings |
+| `RUNNING_IN_DOCKER` | Should remain `true` for containerized deployments |
 
 ---
 
-## 🔐 Custom Verification Logic
+## 🧠 Inbound vs Outbound
 
-You can define your own verification logic by adding Python files to the `custom_verifications/` folder.
+| Direction | Endpoint | Verification | Deduplication | Typical Use |
+|------------|-----------|--------------|----------------|--------------|
+| **Inbound** | `/webhooks/{source}` | Optional (Stripe, Paystack, etc.) | ✅ Yes | Receive events from third parties |
+| **Outbound** | `/dispatch/{destination}` | API Key | ❌ No | Send events to partner systems |
 
-Each file must define:
+---
 
-- `VERIFICATION_TYPE`: A string name to reference in the YAML
-- `verify_signature(secret, headers, body_str)`: An async def that verifies the request
+## 🪵 Observability
 
-### Example: `custom_verifications/mycompany.py`
+Each event record includes:
+
+- `last_status_code` — last HTTP response code received  
+- `last_response_excerpt` — truncated text from the last response  
+- `last_attempt_at` — last delivery attempt timestamp  
+- `last_error` — latest known failure reason  
+
+This allows you to monitor event delivery health and debug failures easily.
+
+---
+
+## 🔐 Custom Verification
+
+You can add your own signature logic via `custom_verifications/`:
 
 ```python
+# app/custom_verifications/mycompany.py
 VERIFICATION_TYPE = "mycompany_signature"
 
 from starlette.datastructures import Headers
 
 async def verify_signature(secret: str, headers: Headers, body_str: str):
     signature = headers.get("x-mycompany-signature")
-    if not signature:
-        raise Exception("Missing MyCompany signature")
-    if signature != secret:
-        raise Exception("Invalid signature")
+    if not signature or signature != secret:
+        raise Exception("Invalid MyCompany signature")
 ```
 
-### Then in your config:
+Then reference it in YAML:
 
 ```yaml
 sources:
@@ -205,57 +227,36 @@ sources:
     type: mycompany_signature
     secret: ${MYCOMPANY_SECRET}
     event_id_path: id
-    handler_url: http://your-backend.com/
+    handler_url: http://your-app.com/handler
+    verify: true
 ```
 
-> 📁 This file must be placed in the `custom_verifications/` folder, mounted into the container at `/app/app/custom_verifications/`.
+---
+
+## 🧩 Example Outbound Integration
+
+Send a dispatch event manually:
+
+```bash
+curl -X POST http://localhost:8000/dispatch/meetball_success   -H "X-BAQO-KEY: secret123"   -H "Content-Type: application/json"   -d '{"event": "order.created", "data": {"id": "12345"}}'
+```
 
 ---
 
-## 🔒 Security Note
+## 📜 Logs & Monitoring
 
-Baqo supports custom verification plugins written in Python. These plugins are executed at runtime with full access to the container’s environment. They can:
-- Access `.env` secrets
-- Make external network requests
-- Read/write files inside the container
-
-⚠️ Treat custom verification files as trusted code.
-
-### ✅ Best practices:
-- Only your team or verified users should modify these files
-- Keep the deploy directory secured and version-controlled
-- Run Baqo in a container (as provided) to sandbox plugin behavior
-
----
-
-## 📜 Viewing Logs
-
-Baqo logs all incoming webhook activity and delivery attempts.
-
-### Live Logs (Docker)
-
+Follow app logs:
 ```bash
 docker compose logs -f app
 ```
 
-For the Celery worker:
-
+Follow worker logs:
 ```bash
 docker compose logs -f worker
 ```
 
-### Database Logs
-
-All events are saved to Postgres with fields like:
-
-- source
-- event_id
-- status
-- payload
-- handler_url
-
-You can query them directly for audit/debugging.
+Query events directly in Postgres to view retry history and results.
 
 ---
 
-**Need help? Reach out or open an issue. Baqo! 🚀**
+**Baqo v0.2.0 — now with full outbound dispatching, improved observability, and smarter retries!** 🌀

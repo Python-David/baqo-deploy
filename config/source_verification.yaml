@@ -1,19 +1,42 @@
+# ==========================================
+# Baqo Source & Destination Configuration
+# ==========================================
+# Define both inbound webhook sources and outbound destinations.
+# Each source/destination may include its own handler URL, secrets, and verification settings.
+
 sources:
+  # Stripe inbound webhook example
   stripe:
     type: stripe
-    secret: ${STRIPE_SECRET}
-    event_id_path: id
-    handler_url: http://host.docker.internal:9002/
-    verify: true
+    secret: ${STRIPE_SECRET}              # Your Stripe webhook signing secret
+    event_id_path: id                     # JSON path to the event ID
+    handler_url: https://webhook.site/80895e38-b446-42cc-a056-5cb7f427c884
+    verify: true                          # Always true for production integrations
 
+  # Example custom company webhook
   mycompany_service:
-    type: mycompany_signature
+    type: mycompany_signature             # Uses your custom verifier plugin
     secret: ${MY_COMPANY_SERVICE_SECRET}
     event_id_path: id
-    handler_url: https://webhook.site/a487641e-6bfb-40f9-bfa8-b7ad6a1cbaba
-    verify: false
+    handler_url: https://webhook.site/80895e38-b446-42cc-a056-5cb7f427c884
+    verify: false                         # Disable for local/internal tests only
 
+  # Open or unauthenticated source
   open_service:
     type: none
     event_id_path: data.transaction_id
-    handler_url: https://example.com/handler
+    handler_url: https://webhook.site/80895e38-b446-42cc-a056-5cb7f427c884
+    verify: false                         # No signature check
+
+# ------------------------------------------
+# Outbound Destinations
+# ------------------------------------------
+# Baqo can also dispatch events to external or partner systems.
+# Use POST /dispatch/{destination} to trigger delivery.
+
+destinations:
+  # Successful downstream simulation
+  test_company:
+    type: none
+    handler_url: https://webhook.site/80895e38-b446-42cc-a056-5cb7f427c884
+    verify: false
